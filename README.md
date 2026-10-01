@@ -273,8 +273,9 @@ explica cómo grabarlos y subirlos a GitHub.
 
 ### Parte A — Drones A → B → C
 
-<!-- Reemplaza la línea siguiente por el enlace de tu video (ver docs/README.md) -->
-▶️ **Video:** _pendiente de agregar_
+
+https://github.com/user-attachments/assets/2401e564-7084-493a-aa3a-2174f9723be6
+
 
 Qué se ve en el video:
 
@@ -282,10 +283,6 @@ Qué se ve en el video:
 2. Con **BTN2** se pasa a modo manual; con **BTN1** la formación va a **B**.
 3. Corrección de la ruta con el joystick y el potenciómetro.
 4. **BTN1** → la formación llega a **C**.
-
-Trayectoria registrada en `flight_log.csv` (8 drones, A → B → C):
-
-![Trayectoria de los drones](docs/img/trayectoria_drones.png)
 
 ### Parte B — Baxter coge y mueve un objeto
 
@@ -303,9 +300,6 @@ Qué se ve en el video:
 
 ### Parte C — Atlas camina por el laboratorio
 
-<!-- Reemplaza la línea siguiente por el enlace de tu video -->
-▶️ **Video:** _pendiente de agregar_
-
 Qué se ve en el video:
 
 1. Atlas baja de la caja azul caminando hacia adelante.
@@ -313,11 +307,11 @@ Qué se ve en el video:
 3. Paneles RGB / Depth / Segmentación de la cámara de su cabeza.
 4. **BTN2** → modos de articulaciones (brazos, piernas, torso) y **BTN1** → posturas.
 
-![Atlas en el laboratorio](docs/img/atlas.png)
 
-Cámara sintética de la cabeza de Atlas (RGB, profundidad y segmentación):
 
-![Cámaras sintéticas](docs/img/atlas_camaras.png)
+https://github.com/user-attachments/assets/89704068-4af8-44f1-9927-8c800ed5f9b8
+
+
 
 ## 7. Problemas encontrados y cómo se resolvieron
 
