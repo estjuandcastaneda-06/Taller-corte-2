@@ -1,40 +1,3 @@
-"""
-atlas_console.py
------------------
-Parte C del taller: consola de mandos con ESP32 para que el robot Atlas
-(Boston Dynamics) CAMINE por el laboratorio "botlab" y mueva sus
-articulaciones, mostrando las 3 cámaras sintéticas de PyBullet
-(RGB, Depth y Segmentation Mask) como en la captura del enunciado.
-
-Basado en atlas.py del repositorio
-    https://github.com/erwincoumans/pybullet_robots
-
-Uso (con el entorno conda "taller" activado):
-    python atlas_console.py                  # sin ESP32: modo teclado
-    python atlas_console.py --port COM7      # con ESP32
-
-MODO CAMINAR (el modo con el que arranca):
-    Joystick Y  (flechas arriba/abajo)   -> caminar hacia adelante / atrás
-    Joystick X  (flechas izq/der)        -> girar a la izquierda / derecha
-    BTN1        (ESPACIO)                -> volver al punto de partida
-MODOS DE ARTICULACIONES (BTN2 / ENTER para cambiar de modo):
-    Caminar -> brazo izq. -> brazo der. -> pierna izq. -> pierna der. -> torso/cabeza -> Caminar
-    X, Y, Z (flechas, RePag/AvPag o U/J)  -> mueven 3 articulaciones de esa parte
-    BTN1        (ESPACIO)                -> siguiente postura (T, brazos abajo, saludo)
-
-Cómo camina (análisis):
-    - Marcha cinemática: un generador de marcha (fase senoidal) calcula en cada
-      paso los ángulos de cadera, rodilla y tobillo de cada pierna (desfasadas
-      180°) y el balanceo contrario de los brazos. La longitud y la frecuencia
-      del paso dependen de la velocidad pedida con el joystick.
-    - El cuerpo (pelvis) avanza y gira según el joystick. Su altura se ajusta en
-      cada instante con rayos hacia abajo (rayTest) para que el pie de apoyo quede
-      sobre el suelo real del laboratorio, así puede bajar de la caja.
-    - Rayos hacia adelante detectan paredes, mesas y escalones altos: si hay un
-      obstáculo, Atlas se detiene en vez de atravesarlo.
-    - La cámara de la GUI sigue al robot y la cámara sintética va en su cabeza.
-"""
-
 import os
 import sys
 import time
@@ -45,18 +8,18 @@ import pybullet as p
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(HERE, ".."))
-from common.serial_bridge import SerialConsole  # noqa: E402
+from common.serial_bridge import SerialConsole 
 
 ROBOTS_DATA = os.path.join(HERE, "..", "pybullet_robots", "data")
 SIM_HZ = 240
 DT = 1.0 / SIM_HZ
-CAM_EVERY = 8          # actualizar las cámaras sintéticas cada N pasos
+CAM_EVERY = 8          
 CAM_W, CAM_H = 320, 200
 
-START_POS = [-2.0, 3.0, -0.47]   # encima de la caja azul, como en atlas.py
+START_POS = [-2.0, 3.0, -0.47]  
 START_YAW = 0.0
 
-# --- Parámetros de la marcha ---------------------------------------------------
+
 MAX_SPEED = 0.6        # m/s hacia adelante
 MAX_BACK_SPEED = 0.3   # m/s hacia atrás
 MAX_TURN = 0.9         # rad/s
@@ -70,7 +33,7 @@ OBSTACLE_DIST = 0.45   # m, distancia a la que se detiene frente a un obstáculo
 JOINT_SPEED = 1.2      # rad/s en los modos de articulaciones
 JOINT_SMOOTH = 3.0     # rad/s, velocidad máx. con la que las articulaciones siguen su objetivo
 
-# Postura base para caminar (rodillas un poco flexionadas, brazos abajo)
+
 WALK_BASE = {"l_leg_hpy": -0.25, "r_leg_hpy": -0.25, "l_leg_kny": 0.5, "r_leg_kny": 0.5,
              "l_arm_shx": -1.3, "r_arm_shx": 1.3, "l_arm_elx": 0.4, "r_arm_elx": -0.4}
 
@@ -98,7 +61,7 @@ def load_scene():
     objs = p.loadSDF("botlab/botlab.sdf", globalScaling=2.0)
     zero = [0, 0, 0]
     y2x = p.getQuaternionFromEuler([np.pi / 2., 0, np.pi / 2])
-    for o in objs:  # el botlab viene con el eje Y hacia arriba: se pasa a Z
+    for o in objs:  
         pos, orn = p.getBasePositionAndOrientation(o)
         newpos, neworn = p.multiplyTransforms(zero, y2x, pos, orn)
         p.resetBasePositionAndOrientation(o, newpos, neworn)
@@ -117,14 +80,13 @@ class AtlasConsole:
                              "https://github.com/erwincoumans/pybullet_robots dentro de la carpeta del taller.")
         p.setGravity(0, 0, -10)
         p.setTimeStep(DT)
-        # Paneles de cámara sintética visibles (RGB / Depth / Segmentation)
+        
         p.configureDebugVisualizer(p.COV_ENABLE_GUI, 1)
         p.configureDebugVisualizer(p.COV_ENABLE_RGB_BUFFER_PREVIEW, 1)
         p.configureDebugVisualizer(p.COV_ENABLE_DEPTH_BUFFER_PREVIEW, 1)
         p.configureDebugVisualizer(p.COV_ENABLE_SEGMENTATION_MARK_PREVIEW, 1)
 
         self.atlas = load_scene()
-        # Atlas se mueve cinemáticamente: no choca con nada y los rayos lo ignoran
         for link in range(-1, p.getNumJoints(self.atlas)):
             p.setCollisionFilterGroupMask(self.atlas, link, 0, 0)
 
@@ -139,9 +101,9 @@ class AtlasConsole:
                      if p.getJointInfo(self.atlas, i)[12].decode() in ("l_foot", "r_foot")]
         self.head = self.jid["neck_ry"]
 
-        self.q = {n: 0.0 for n in self.jid}          # ángulo actual de cada articulación
-        self.manual = {n: 0.0 for n in self.jid}     # objetivo en los modos de articulaciones
-        self.group = 0                                # 0 = Caminar
+        self.q = {n: 0.0 for n in self.jid}          
+        self.manual = {n: 0.0 for n in self.jid}     
+        self.group = 0                               
         self.pose = 0
         self.steps = 0
         self.reset_position()
@@ -151,7 +113,6 @@ class AtlasConsole:
         self.txt = p.addUserDebugText("", [0, 0, 0], [0, 0, 0], 1.2)
         self._last_txt = None
 
-    # ------------------------------------------------------------ utilidades
     def reset_position(self):
         self.pos = np.array(START_POS, dtype=float)
         self.yaw = START_YAW
@@ -175,8 +136,8 @@ class AtlasConsole:
         side = np.array([-fwd[1], fwd[0], 0.0])
         foot_z = self.pos[2] - 0.95
         starts, ends = [], []
-        for h in (MAX_STEP_UP + 0.05, 0.45, 0.7, 0.95, 1.2, 1.45, 1.7):  # de rodilla a cabeza
-            for lat in (-0.3, 0.0, 0.3):                                   # ancho del cuerpo
+        for h in (MAX_STEP_UP + 0.05, 0.45, 0.7, 0.95, 1.2, 1.45, 1.7):  
+            for lat in (-0.3, 0.0, 0.3):                                   
                 start = self.pos + side * lat
                 start[2] = foot_z + h
                 starts.append(start.tolist())
@@ -188,13 +149,12 @@ class AtlasConsole:
         ground_ahead = self._ray_down(ahead[0], ahead[1], self._knee_z())
         return ground_ahead - ground_here > MAX_STEP_UP
 
-    # ---------------------------------------------------------------- marcha
     def _gait(self, state):
         target_speed = state["y"] * (MAX_SPEED if state["y"] > 0 else MAX_BACK_SPEED)
         target_turn = -state["x"] * MAX_TURN
         if target_speed != 0 and self._blocked(target_speed):
             target_speed = 0.0
-        # rampas suaves de aceleración
+    
         self.speed += np.clip(target_speed - self.speed, -ACCEL * DT, ACCEL * DT)
         self.turn += np.clip(target_turn - self.turn, -2 * MAX_TURN * DT, 2 * MAX_TURN * DT)
         if abs(self.speed) < 1e-3 and target_speed == 0:
@@ -204,7 +164,6 @@ class AtlasConsole:
         self.pos[0] += self.speed * np.cos(self.yaw) * DT
         self.pos[1] += self.speed * np.sin(self.yaw) * DT
 
-        # intensidad de la marcha (también da pasos al girar en el sitio)
         activity = min(1.0, max(abs(self.speed) / MAX_SPEED, abs(self.turn) / MAX_TURN * 0.6))
         self.gait_amp += np.clip(activity - self.gait_amp, -2 * DT, 2 * DT)
         direction = -1.0 if self.speed < 0 else 1.0
@@ -214,13 +173,13 @@ class AtlasConsole:
         a = self.gait_amp
         target = dict(WALK_BASE)
         for side, ph in (("l", self.phase), ("r", self.phase + np.pi)):
-            hip = WALK_BASE[f"{side}_leg_hpy"] - HIP_AMP * a * np.sin(ph)   # negativo = pierna adelante
+            hip = WALK_BASE[f"{side}_leg_hpy"] - HIP_AMP * a * np.sin(ph) 
             knee = WALK_BASE[f"{side}_leg_kny"] + KNEE_LIFT * a * max(0.0, np.cos(ph) * direction)
             target[f"{side}_leg_hpy"] = hip
             target[f"{side}_leg_kny"] = knee
-            target[f"{side}_leg_aky"] = -(hip + knee)                        # pie paralelo al suelo
+            target[f"{side}_leg_aky"] = -(hip + knee)                        
         swing = ARM_SWING * a * np.sin(self.phase)
-        target["l_arm_shz"] = swing        # brazo contrario a la pierna del mismo lado
+        target["l_arm_shz"] = swing        
         target["r_arm_shz"] = swing
         target["back_bkz"] = -0.08 * a * np.sin(self.phase)
         return target
@@ -230,15 +189,15 @@ class AtlasConsole:
         feet_bottom = min(p.getAABB(self.atlas, f)[0][2] for f in self.feet)
         ground = max(self._ray_down(*p.getLinkState(self.atlas, f)[4][:2], self._knee_z())
                      for f in self.feet)
-        error = ground - feet_bottom            # >0 = pie enterrado, <0 = pie en el aire
-        if error < -0.02:                       # cae (p.ej. al bajar de la caja)
+        error = ground - feet_bottom            
+        if error < -0.02:                     
             self.vz -= 9.81 * DT
             self.pos[2] += max(self.vz * DT, error)
         else:
             self.vz = 0.0
             self.pos[2] += np.clip(error, -0.02, 0.02)
 
-    # ----------------------------------------------------------------- ciclo
+   
     def step(self, state):
         if state["mode"] == "B":
             if state["btn2_pressed"]:
@@ -267,7 +226,7 @@ class AtlasConsole:
                                                        lo, hi))
             target = self.manual
 
-        # articulaciones siguen su objetivo con velocidad limitada -> movimiento fluido
+
         max_dq = JOINT_SMOOTH * DT if self.group != 0 else 6.0 * DT
         for n, i in self.jid.items():
             lo, hi = self.limits[n]
@@ -290,7 +249,7 @@ class AtlasConsole:
         self.steps += 1
 
     def _follow_camera(self):
-        cam = p.getDebugVisualizerCamera()   # conserva el zoom/ángulo que elija el usuario
+        cam = p.getDebugVisualizerCamera()   
         p.resetDebugVisualizerCamera(cam[10], cam[8], cam[9], (self.pos + [0, 0, -0.3]).tolist())
 
     def _update_text(self):
