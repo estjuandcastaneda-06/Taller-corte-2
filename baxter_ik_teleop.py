@@ -246,6 +246,7 @@ def main():
         console.close()
         if p.isConnected():
             p.disconnect()
+##
 
 
 if __name__ == "__main__":
