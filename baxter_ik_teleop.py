@@ -1,29 +1,3 @@
-"""
-baxter_ik_teleop.py
---------------------
-Parte B del taller: consola de mandos con ESP32 para mover los brazos del
-robot Baxter mediante cinemática inversa (IK), con posicionamiento real del
-efector final, y que el robot pueda COGER y MOVER un objeto.
-
-Usa el modelo de Baxter del repositorio
-    https://github.com/erwincoumans/pybullet_robots   (carpeta data/baxter_common)
-y la misma idea de baxter_ik_demo.py (IK sobre el link "left_endpoint").
-
-Uso (con el entorno conda "taller" activado):
-    python baxter_ik_teleop.py                 # sin ESP32: modo teclado
-    python baxter_ik_teleop.py --port COM5     # con ESP32
-
-Controles (ESP32 en modo "B"  /  teclado):
-    Joystick X  (flechas izq/der)       -> mueve la pinza adelante/atrás
-    Joystick Y  (flechas arriba/abajo)  -> mueve la pinza izquierda/derecha
-    Eje Z       (RePag/AvPag, U/J)      -> sube / baja la pinza
-    BTN1        (ESPACIO)               -> cerrar pinza (agarrar) / abrir (soltar)
-    BTN2        (ENTER o B)             -> cambiar de brazo (izquierdo <-> derecho)
-
-Tarea demostrativa: llevar el cubo verde desde su posición hasta el
-cuadro rojo ("ZONA DESTINO") sobre la mesa.
-"""
-
 import os
 import sys
 import time
@@ -35,7 +9,7 @@ import pybullet_data
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(HERE, ".."))
-from common.serial_bridge import SerialConsole  # noqa: E402
+from common.serial_bridge import SerialConsole 
 
 ROBOTS_DATA = os.path.join(HERE, "..", "pybullet_robots", "data")
 BAXTER_URDF = os.path.join(ROBOTS_DATA, "baxter_common", "baxter_description", "urdf", "toms_baxter.urdf")
@@ -47,7 +21,7 @@ TABLE_TOP_Z = -0.20      # altura de la mesa (el origen del robot está en el to
 CUBE_START = [0.80, 0.05, TABLE_TOP_Z + 0.025]
 DROP_ZONE = [0.55, 0.45]
 
-# Espacio de trabajo permitido para el objetivo de la pinza (evita posturas imposibles)
+
 WS_MIN = np.array([0.35, -0.75, TABLE_TOP_Z + 0.01])
 WS_MAX = np.array([1.05, 0.75, 0.60])
 
@@ -55,7 +29,7 @@ ARMS = {
     "izquierdo": {"ee": 48, "prefix": "left_", "fingers": (49, 51)},
     "derecho":   {"ee": 26, "prefix": "right_", "fingers": (27, 29)},
 }
-# Postura inicial "natural" de los brazos (codos doblados, pinza hacia abajo)
+
 REST = {"s0": 0.0, "s1": -0.55, "e0": 0.0, "e1": 1.5, "w0": 0.0, "w1": 0.6, "w2": 0.0}
 GRIPPER_DOWN = p.getQuaternionFromEuler([np.pi, 0, 0])
 
@@ -77,7 +51,7 @@ class BaxterTeleop:
         self.robot = p.loadURDF(BAXTER_URDF, [0, 0, 0], useFixedBase=True,
                                 flags=p.URDF_USE_SELF_COLLISION_EXCLUDE_ALL_PARENTS)
 
-        # Mesa + objeto + zona destino
+
         half = [0.35, 0.65, (TABLE_TOP_Z + 0.93) / 2]
         col = p.createCollisionShape(p.GEOM_BOX, halfExtents=half)
         vis = p.createVisualShape(p.GEOM_BOX, halfExtents=half, rgbaColor=[0.55, 0.4, 0.3, 1])
@@ -88,7 +62,7 @@ class BaxterTeleop:
         p.changeVisualShape(self.cube, -1, rgbaColor=[0.1, 0.8, 0.1, 1])
         p.changeDynamics(self.cube, -1, lateralFriction=1.0)
 
-        # Articulaciones móviles y límites (para una IK con espacio nulo realista)
+
         self.joints = [i for i in range(p.getNumJoints(self.robot))
                        if p.getJointInfo(self.robot, i)[3] > -1]
         self.names = [p.getJointInfo(self.robot, i)[1].decode() for i in self.joints]
@@ -100,7 +74,7 @@ class BaxterTeleop:
             key = n.split("_")[-1]
             if n.startswith(("left_", "right_")) and key in REST:
                 val = REST[key]
-                # el brazo derecho es el espejo del izquierdo en s0/e0/w0/w2
+
                 if n.startswith("right_") and key in ("s0", "e0", "w0", "w2"):
                     val = -val
                 self.rest.append(val)
@@ -108,12 +82,12 @@ class BaxterTeleop:
                 self.rest.append(0.0)
         for j, q in zip(self.joints, self.rest):
             p.resetJointState(self.robot, j, q)
-        self.cmd = list(self.rest)  # último comando de cada articulación
+        self.cmd = list(self.rest)  
 
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
         p.resetDebugVisualizerCamera(2.2, 60, -25, [0.5, 0, 0.0])
 
-        # Objetivo inicial de cada brazo: sobre la mesa, frente a su hombro
+  
         self.targets = {"izquierdo": np.array([0.65, 0.30, 0.05]),
                         "derecho": np.array([0.65, -0.30, 0.05])}
         self.grip_closed = {"izquierdo": False, "derecho": False}
@@ -121,7 +95,7 @@ class BaxterTeleop:
         self.grasp_cid = None
         self.grasp_arm = None
 
-        # Llevar los dos brazos a su pose inicial antes de empezar
+
         for arm in ARMS:
             self._solve_ik(arm, iterations=40, teleport=True)
         for j, q in zip(self.joints, self.cmd):
@@ -132,7 +106,7 @@ class BaxterTeleop:
         self.txt_status = p.addUserDebugText("", [0.2, 0, 0.95], [0, 0, 0], 1.3)
         self._update_text(force=True)
 
-    # ------------------------------------------------------------------ IK
+ 
     def _solve_ik(self, arm, iterations=1, teleport=False):
         info = ARMS[arm]
         prefix = info["prefix"]
@@ -143,7 +117,7 @@ class BaxterTeleop:
                 lowerLimits=self.ll, upperLimits=self.ul, jointRanges=self.jr,
                 restPoses=self.rest, maxNumIterations=100, residualThreshold=1e-4)
             for k, n in enumerate(self.names):
-                if n.startswith(prefix):  # solo las articulaciones del brazo activo
+                if n.startswith(prefix):  
                     self.cmd[k] = q[k]
                     if teleport:
                         p.resetJointState(self.robot, self.joints[k], q[k])
@@ -163,7 +137,7 @@ class BaxterTeleop:
             p.setJointMotorControl2(self.robot, lf, p.POSITION_CONTROL, targetPosition=opening, force=20)
             p.setJointMotorControl2(self.robot, rf, p.POSITION_CONTROL, targetPosition=-opening, force=20)
 
-    # ------------------------------------------------------------- agarre
+
     def ee_pos(self, arm=None):
         return np.array(p.getLinkState(self.robot, ARMS[arm or self.arm]["ee"])[4])
 
@@ -180,7 +154,7 @@ class BaxterTeleop:
             cube_pos, cube_orn = p.getBasePositionAndOrientation(self.cube)
             dist = np.linalg.norm(self.ee_pos() - np.array(cube_pos))
             if dist < GRASP_DISTANCE and self.grasp_cid is None:
-                # restricción fija que conserva la pose relativa pinza-cubo
+  
                 ls = p.getLinkState(self.robot, ARMS[arm]["ee"])
                 inv_pos, inv_orn = p.invertTransform(ls[4], ls[5])
                 rel_pos, rel_orn = p.multiplyTransforms(inv_pos, inv_orn, cube_pos, cube_orn)
@@ -198,7 +172,7 @@ class BaxterTeleop:
             print("Pinza abierta.")
         self._set_fingers_all()
 
-    # -------------------------------------------------------------- ciclo
+ 
     def step(self, state, dt=1.0 / SIM_HZ):
         """Un ciclo de control. dt = tiempo real transcurrido (s), para que la
         velocidad de la pinza sea la misma aunque la ventana vaya lenta."""
@@ -216,7 +190,7 @@ class BaxterTeleop:
 
         self._solve_ik(self.arm)
         self._apply_motors()
-        # la física avanza lo mismo que el tiempo real (1 a 4 sub-pasos de 1/240 s)
+   
         for _ in range(max(1, min(4, int(round(dt * SIM_HZ))))):
             p.stepSimulation()
         self._frames = getattr(self, "_frames", 0) + 1
