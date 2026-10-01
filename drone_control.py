@@ -1,34 +1,3 @@
-"""
-drone_control.py
------------------
-Parte A del taller: mover un ENJAMBRE de drones simulados de un punto A a un
-punto B y a un punto C, con el control gestionado desde el ESP32.
-
-Se apoya en el repositorio  https://github.com/utiasDSL/gym-pybullet-drones
-(entorno CtrlAviary + controlador DSLPIDControl, igual que examples/pid.py).
-
-Uso (con el entorno conda "taller" activado):
-    python drone_control.py                      # sin ESP32: modo teclado
-    python drone_control.py --port COM5          # con ESP32 en ese puerto
-    python drone_control.py --num_drones 4       # menos drones (PC lento)
-    python drone_control.py --auto False         # solo avanza con BTN1
-
-Controles (ESP32 en modo "D"  /  teclado):
-    Joystick X/Y  (flechas)        -> desplaza la formación en X/Y
-    Eje Z         (RePag/AvPag, U/J)-> sube / baja la formación
-    BTN1          (ESPACIO)        -> ir al siguiente punto (A -> B -> C -> A ...)
-    BTN2          (ENTER o B)      -> activar / desactivar modo automático
-
-Lógica:
-    - Los drones despegan del suelo y forman un círculo alrededor del
-      "centro de formación".
-    - El centro de formación viaja SUAVEMENTE (velocidad limitada) hacia el
-      punto activo; cada dron sigue su posición relativa con un PID.
-    - En modo automático, al llegar a un punto esperan HOLD_TIME segundos y
-      siguen al siguiente; al llegar a C se quedan en hover.
-    - Se guarda un log en drones/flight_log.csv como evidencia.
-"""
-
 import os
 import sys
 import time
@@ -36,7 +5,7 @@ import argparse
 import numpy as np
 
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-from common.serial_bridge import SerialConsole  # noqa: E402
+from common.serial_bridge import SerialConsole  
 
 try:
     import pybullet as p
@@ -52,7 +21,7 @@ except ImportError as e:
         f"Detalle: {e}"
     )
 
-# --- Puntos A, B y C de la misión (centro de la formación, en metros) -------
+
 WAYPOINTS = {
     "A": np.array([0.0, 0.0, 1.0]),
     "B": np.array([1.5, 1.5, 1.3]),
@@ -81,7 +50,7 @@ def draw_waypoints(client):
     pts = [WAYPOINTS[k] for k in WP_NAMES]
     for k in WP_NAMES:
         wp = WAYPOINTS[k]
-        # poste vertical desde el suelo + etiqueta
+
         p.addUserDebugLine([wp[0], wp[1], 0], wp.tolist(), WP_COLORS[k], 2, physicsClientId=client)
         p.addUserDebugText(k, (wp + [0, 0, 0.15]).tolist(), WP_COLORS[k], textSize=2.0,
                            physicsClientId=client)
@@ -106,7 +75,7 @@ def main():
 
     n = args.num_drones
     offsets = formation_offsets(n, FORMATION_RADIUS)
-    init_xyzs = offsets + np.array([0.0, 0.0, 0.1])  # en el suelo, debajo del punto A
+    init_xyzs = offsets + np.array([0.0, 0.0, 0.1])  
 
     env = CtrlAviary(
         drone_model=DroneModel.CF2X,
@@ -133,8 +102,8 @@ def main():
                                        physicsClientId=client)
 
     wp_idx = 0
-    goal = WAYPOINTS[WP_NAMES[wp_idx]].copy()   # punto hacia donde va la formación
-    center = np.array([0.0, 0.0, 0.1])          # centro de formación comandado (suave)
+    goal = WAYPOINTS[WP_NAMES[wp_idx]].copy()   
+    center = np.array([0.0, 0.0, 0.1])        
     auto = args.auto
     arrived_since = None
 
@@ -154,7 +123,7 @@ def main():
             if args.gui and not p.isConnected(client):
                 break
 
-            # ---------------- Entrada de la consola (ESP32 o teclado) ----------
+          
             state = console.read(pybullet_module=p, client_id=client)
             if state["mode"] == "D":
                 if state["btn2_pressed"]:
@@ -171,13 +140,13 @@ def main():
                     goal += joy * JOYSTICK_SPEED * dt
                     goal[2] = np.clip(goal[2], 0.3, 3.0)
 
-            # ---------------- Trayectoria suave del centro de formación --------
+
             delta = goal - center
             dist = np.linalg.norm(delta)
             max_step = CRUISE_SPEED * dt
             center = goal.copy() if dist <= max_step else center + delta / dist * max_step
 
-            # ---------------- Simulación + PID de cada dron ---------------------
+
             obs, _, terminated, truncated, _ = env.step(action)
             positions = obs[:, 0:3]
             targets = center + offsets
@@ -185,8 +154,8 @@ def main():
                 action[j, :], _, _ = ctrls[j].computeControlFromState(
                     control_timestep=dt, state=obs[j], target_pos=targets[j])
 
-            # ---------------- ¿Llegó la formación al punto activo? -------------
-            t = step * dt  # tiempo simulado
+          
+            t = step * dt  
             err = np.mean(np.linalg.norm(positions - (goal + offsets), axis=1))
             if err < ARRIVE_THRESHOLD:
                 if arrived_since is None:
@@ -198,7 +167,7 @@ def main():
                     arrived_since = None
                     print(f"-> Yendo al punto {WP_NAMES[wp_idx]}: {goal}")
 
-            # ---------------- Log + texto en pantalla ---------------------------
+           
             log_file.write(f"{t:.3f},{WP_NAMES[wp_idx]},{center[0]:.3f},{center[1]:.3f},{center[2]:.3f},"
                            + ",".join(f"{q[0]:.3f},{q[1]:.3f},{q[2]:.3f}" for q in positions) + "\n")
             if args.gui:
@@ -209,7 +178,7 @@ def main():
                                                    replaceItemUniqueId=status_id,
                                                    physicsClientId=client)
                     last_status = txt
-                sync(step, start, dt)  # tiempo real
+                sync(step, start, dt)  
 
             step += 1
             if args.duration and t >= args.duration:
