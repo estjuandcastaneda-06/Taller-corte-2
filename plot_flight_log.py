@@ -1,14 +1,3 @@
-"""
-plot_flight_log.py
--------------------
-Grafica la trayectoria registrada en flight_log.csv (lo genera drone_control.py)
-para anexarla como evidencia de la Parte A.
-
-Uso:
-    python plot_flight_log.py                      # guarda ../docs/img/trayectoria_drones.png
-    python plot_flight_log.py --show               # además abre la ventana de la gráfica
-"""
-
 import os
 import argparse
 import numpy as np
